@@ -1,0 +1,40 @@
+# A tiny replay for tests and smoke runs: finishes in well under a second.
+# Not an experiment; its numbers mean nothing. 9 weeks = 3 warm-up weeks + 5 full
+# windows (the sixth is incomplete because the first event is a few seconds after 0).
+
+name: synthetic-small
+
+data:
+  source: synthetic
+  synthetic:
+    n_users: 200
+    n_new_users_per_day: 2.0
+    n_items_initial: 400
+    n_new_items_per_day: 8.0
+    n_clusters: 8
+    n_days: 63
+    events_per_user_per_day: 2.0
+    drift_strength: 0.5
+    seed: 7
+
+replay:
+  warmup_days: 21
+  step_days: 7
+  lookback_days: 21
+  tuning_windows: 1
+
+eval:
+  k: 10
+
+model:
+  name: popularity
+
+policies: [never, always, "fixed:2", on_drift]
+
+drift:
+  n_buckets: 5
+  thresholds:
+    popularity_psi: null
+    popularity_jsd: null
+    new_item_share: 0.1
+    new_user_share: null
