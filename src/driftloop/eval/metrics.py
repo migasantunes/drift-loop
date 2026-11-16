@@ -59,7 +59,7 @@ def ndcg_at_k(recs: np.ndarray, truth: Sequence[np.ndarray]) -> np.ndarray:
 def hit_rate_at_k(recs: np.ndarray, truth: Sequence[np.ndarray]) -> np.ndarray:
     """Per-user 1.0 if at least one relevant item is in the top k, else 0.0."""
     hits, _ = _hit_matrix(recs, truth)
-    return hits.any(axis=1).astype(np.float64)
+    return np.asarray(hits.any(axis=1), dtype=np.float64)
 
 
 def coverage(recs: np.ndarray, n_items_available: int) -> float:

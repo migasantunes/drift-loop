@@ -18,6 +18,7 @@ fail when the corresponding leak was introduced on purpose:
 
 from __future__ import annotations
 
+import itertools
 import math
 from typing import Self
 
@@ -95,6 +96,9 @@ class SpyModel(PopularityRecommender):
     def __init__(self, log: list[dict[str, int]]) -> None:
         super().__init__()
         self._log = log
+        # A serial number, not id(self): ids are reused once a replaced model is
+        # garbage-collected, which made this check fail at random.
+        self._serial = next(_SERIALS)
 
     def fit(self, interactions: pl.DataFrame, *, until: int) -> Self:
         ts = interactions.get_column(TS)
@@ -104,8 +108,11 @@ class SpyModel(PopularityRecommender):
         assert isinstance(ts_max, int)
         assert isinstance(ts_min, int)
         assert ts_max < until, f"fit saw ts={ts_max} >= until={until}"
-        self._log.append({"until": until, "ts_min": ts_min, "ts_max": ts_max, "id": id(self)})
+        self._log.append({"until": until, "ts_min": ts_min, "ts_max": ts_max, "id": self._serial})
         return super().fit(interactions, until=until)
+
+
+_SERIALS = itertools.count()
 
 
 def _run_with_spy(
