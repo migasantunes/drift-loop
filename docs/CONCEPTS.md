@@ -231,8 +231,9 @@ scoring a policy on the windows its thresholds were chosen on would be leakage.
 
 **Schedule versus trigger.** A schedule (`fixed(n)`: every n windows) is simple,
 predictable and what most teams run. A trigger retrains only when something happened.
-The two bounds frame both: `never` shows how fast a frozen model decays, `always` shows
-the best quality retraining can buy and its maximum cost. The headline result, over the windows
+Two reference points frame both: `never` shows how fast a frozen model decays, `always`
+shows what the most frequent retraining achieves and its maximum cost (it is not
+guaranteed to be best in every window). The headline result, over the windows
 after the tuning windows, is how much of the gap between them a policy closes, against
 what it pays.
 
@@ -335,5 +336,6 @@ arrive quickly in music.
 **11. Why must the gate's candidate not train on the window it is judged on?** It would
 have seen the answers. Train on `history_before(t - step)`, score on `[t - step, t)`.
 
-**12. What does `always` tell you?** The best quality retraining can buy, at maximum
-cost. With `never` it brackets every other policy.
+**12. What does `always` tell you?** What the most frequent retraining achieves, at
+maximum cost. With `never` it gives the two reference points every other policy is
+read against; it is not a strict upper bound, since a fresher model can lose a window.

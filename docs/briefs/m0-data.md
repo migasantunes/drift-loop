@@ -50,7 +50,7 @@ def download(size: str, out_dir: Path, files: Sequence[str] = ("listens.parquet"
 
 def load_interactions(data_dir: Path, size: str = "50m", **kwargs) -> pl.DataFrame: ...
 ```
-- Raw columns and semantics are in `docs/DATASET.md` (`timestamp` is in 5-second units; `ts = timestamp * 5`).
+- Raw columns and semantics are in `docs/DATASET.md` (the brief originally fixed `ts = timestamp * 5`; after review the unit became the parameter `timestamp_unit_seconds`, default 1 - see decision D13).
 - `listens_to_interactions` stays lazy until the final collect and returns a canonical table.
 - `organic_value` is a parameter because the dataset card is ambiguous about which value means organic (open question in `DATASET.md`).
 - `download` fetches `flat/<size>/<file>` from the Hub dataset `yandex/yambda` with `huggingface_hub` (imported lazily; raise a clear error naming `uv sync --extra data` if it is missing). Validate `size` against `{"50m", "500m", "5b"}`. Do not call the network in tests.

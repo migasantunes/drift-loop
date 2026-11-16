@@ -18,32 +18,37 @@ policy keep, and what does it cost?**
 
 ```bash
 uv sync
-make demo        # about 20 s: replays 20 synthetic weeks under four retrain policies
+make demo        # about 20 s: replays 20 synthetic weeks under five retrain policies
 make check       # lint, format, types, tests
 ```
 
 `make demo` writes `runs/demo/` with a per-window results table, a summary and this chart:
 
-![Recall@20 per window for four retrain policies on synthetic data](docs/img/demo-quality.png)
+![Recall@20 per window for five retrain policies on synthetic data](docs/img/demo-quality.png)
 
 On this synthetic run (settings in [`configs/synthetic-demo.yaml`](configs/synthetic-demo.yaml),
-popularity baseline, 11 scored one-week windows after 4 tuning windows):
+popularity baseline, 11 scored one-week windows after 4 tuning windows, one seed):
 
-| Policy | Mean recall@20 | Retrains | Share of the possible gain kept | Share of the maximum cost |
+| Policy | Mean recall@20 | Retrains | Share of `always`'s gain over `never` | Share of `always`'s retrains |
 |---|---|---|---|---|
 | `never` (frozen model) | 0.0322 | 0 | 0% | 0% |
 | `fixed:4` (every 4 windows) | 0.0361 | 3 | 61% | 27% |
 | `on_drift` | 0.0368 | 5 | 72% | 45% |
+| `fixed:2` (every 2 windows) | 0.0370 | 6 | 75% | 55% |
 | `always` (every window) | 0.0386 | 11 | 100% | 100% |
 
 What this does and does not show:
 
 - It shows the harness works end to end and that a frozen model falls behind.
-- It is **synthetic data and a trivial model**. The numbers say nothing about real
-  recommenders; M1 repeats the experiment on real data.
-- Drift-triggered retraining is **not** better than a plain schedule here. The
-  synthetic drift is smooth, so the trigger fires at a steady rhythm and behaves
-  like a two-window schedule. Whether a trigger earns its keep on real, burstier
+- It is **synthetic data and a trivial model**, and the amount of drift in the
+  generator was chosen by looking at outcomes so that the effect is visible. It
+  illustrates the harness; it is not evidence about any policy. M1 repeats the
+  experiment on real data.
+- It is one seed. Across four seeds, schedules of equal cost differed by about 0.1
+  in kept share from timing alone, so the percentages are not precise to two digits.
+- Drift-triggered retraining is **not** better than a plain schedule here: it lands
+  next to `fixed:2`. Its signals (share of events on new items and new users) grow
+  steadily with model age, so the trigger fires at a steady rhythm. Whether a trigger earns its keep on real, burstier
   data is one of the things the project is set up to find out.
 - Recall falls over time for every policy, including `always`. That is the
   protocol, not staleness: ground truth is items new to each user, and those get

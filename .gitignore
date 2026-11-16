@@ -10,10 +10,11 @@ dist/
 build/
 *.egg-info/
 
-# Data and run outputs are never committed (see docs/DATASET.md)
-data/
-runs/
-mlruns/
+# Data and run outputs are never committed (see docs/DATASET.md).
+# Anchored to the repo root: an unanchored `data/` would also ignore src/driftloop/data.
+/data/
+/runs/
+/mlruns/
 *.parquet
 *.npy
 *.faiss

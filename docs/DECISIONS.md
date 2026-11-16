@@ -58,6 +58,16 @@ the data its thresholds were fitted to.
 On the synthetic demo, drift-triggered retraining behaved like a fixed two-window
 schedule (the generator's drift is smooth), and PSI/JSD carried no staleness signal
 (a frozen model read lower than a fresh one). Recall also falls for every policy
-because new-to-user ground truth gets harder as histories grow. None of this is
+because new-to-user ground truth gets harder as histories grow. Reviewing the run also showed why: new-item and new-user share
+against a fixed reference rise almost monotonically with model age, so an input
+trigger built on them is close to a model-age threshold by construction, not only
+because the synthetic drift is smooth. None of this is
 tuned away; M1 tests whether real data behaves differently and adds a bursty-drift
 synthetic scenario as a controlled check of the trigger.
+
+## D13 - The Yambda timestamp unit is a parameter, default seconds (16 Nov 2026)
+The dataset card reads as "5-second units"; the paper's formula implies the stored
+value is already seconds, rounded down to a multiple of 5. The adapter first
+multiplied by 5. Review caught that this would silently make every window five
+times too short if the paper is right. The unit is now `timestamp_unit_seconds`
+(default 1), and settling it from the data is the first task of M1.

@@ -20,8 +20,12 @@ data:
     # The generator default (1.0) makes every week look like a new catalogue. 0.3 is
     # the low end of the realistic range and was chosen before any threshold: it is
     # the smallest value tried (0, 0.3, 0.5) at which always beats never clearly.
+    # That choice was made by looking at full-replay outcomes, so this demo
+    # illustrates the harness and is not evidence about any policy.
     drift_strength: 0.3
     # 20 weeks: 4 warm-up weeks, then 15 one-week windows (4 tuning + 11 scored).
+    # Windows start at the first event's timestamp, not at day 0 of the generator, so
+    # the last partial week does not make a 16th window: 20 weeks give 15 windows.
     n_days: 140
     seed: 0
     # Everything else is the generator default, listed so the file is the full record.
@@ -52,7 +56,9 @@ eval:
 model:
   name: popularity
 
-policies: [never, always, "fixed:4", on_drift]
+# fixed:2 retrains about as often as on_drift does here, so it is the like-for-like
+# schedule to compare drift-triggered retraining against; fixed:4 is the cheaper one.
+policies: [never, always, "fixed:2", "fixed:4", on_drift]
 
 drift:
   n_buckets: 10
@@ -69,9 +75,12 @@ drift:
   #
   # popularity_psi and popularity_jsd are disabled: in the tuning windows the frozen
   # model reads lower on both (PSI 0.0030, 0.0019 at age 2-3) than a fresh one
-  # (0.0053-0.0075), so on this generator they measure sampling noise, not
-  # staleness. Trends here move demand between clusters, which the popularity-rank
-  # buckets of a single global ranking barely register.
+  # (0.0053-0.0075), so on this generator they do not track staleness. They are not
+  # pure sampling noise either: with drift off their floor is about 0.001-0.002,
+  # while fresh models here read 0.004-0.009. A likely cause is the decaying
+  # freshness boost (last week's hits fading from the reference ranking), but that
+  # is not established. Trends here move demand between clusters, which the
+  # popularity-rank buckets of a single global ranking barely register.
   thresholds:
     popularity_psi: null
     popularity_jsd: null

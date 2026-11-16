@@ -78,7 +78,7 @@ part of what staleness costs.
 | Policy | Retrains | Role |
 |---|---|---|
 | `never` | Only the warm-up fit | Lower bound: how fast does a frozen model decay? |
-| `always` | Before every window | Upper bound on quality, maximum cost |
+| `always` | Before every window (the first is a no-op: the warm-up model is already current) | Reference point: the most frequent retraining, maximum cost |
 | `fixed(n)` | Every n windows | The schedule most teams actually run |
 | `on_drift` | When the detector fires | Input-based trigger |
 | `on_decay` (M1) | When measured quality drops | Label-based trigger |
@@ -89,7 +89,10 @@ Two numbers per policy over the scored windows (all windows after the tuning
 windows, see "Drift signals"): **mean quality** and **cost**
 (number of retrains and total fit seconds). The result to report is the trade-off:
 the share of `always`'s quality gain over `never` that a policy keeps, against the
-share of `always`'s cost it pays. One chart shows quality per window for every
+share of `always`'s retrains it pays for. `always` is a reference point, not a
+guaranteed optimum: a fresher model is not better in every window, so the kept
+share can exceed 1 or fall below 0, and it is noisy when `always` and `never` are
+close. One chart shows quality per window for every
 policy, with retrain events marked.
 
 ## Drift signals

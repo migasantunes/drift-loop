@@ -21,6 +21,8 @@ def _frame(rows: list[tuple[int, int, int, float]]) -> pl.DataFrame:
 
 
 # Summed weights: item 30 -> 3.0, item 20 -> 2.0, item 10 -> 2.0, item 40 -> 0.5.
+# Row counts: 30 -> 3, 10 -> 2, 40 -> 2, 20 -> 1. Counting rows instead of summing
+# weight would rank 40 above 20, so the order below separates the two.
 TRAIN = _frame(
     [
         (1, 30, 0, 1.0),
@@ -29,7 +31,8 @@ TRAIN = _frame(
         (1, 20, 3, 2.0),
         (2, 10, 4, 1.0),
         (3, 10, 5, 1.0),
-        (1, 40, 6, 0.5),
+        (1, 40, 6, 0.25),
+        (2, 40, 6, 0.25),
     ]
 )
 
@@ -49,7 +52,8 @@ def test_orders_by_summed_weight_with_id_tie_break() -> None:
     model = _fitted()
     assert model.trained_until == 7
     recs = model.recommend(np.array([1]), 4)
-    # 10 and 20 tie at 2.0; the smaller id wins. Weight, not count, decides 20 vs 40.
+    # 10 and 20 tie at 2.0; the smaller id wins. 40 has more rows than 20 but less
+    # weight, so it ranking last shows weight, not count, decides.
     np.testing.assert_array_equal(recs, [[30, 10, 20, 40]])
     assert recs.dtype == np.int64
 

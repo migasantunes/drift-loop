@@ -54,6 +54,11 @@ jobs:
         with:
           context: .
           push: false
+          load: true
           tags: drift-loop:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # A build that succeeds can still ship an image that cannot import the package.
+      - name: Smoke-test the image
+        run: docker run --rm drift-loop:ci --help

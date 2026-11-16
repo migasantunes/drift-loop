@@ -74,6 +74,9 @@ class YambdaSettings(_Strict):
     min_played_ratio_pct: int = Field(default=50, ge=0)
     organic_only: bool = False
     organic_value: Literal[0, 1] = 1
+    #: Seconds per raw timestamp unit; 1 or 5 depending on which source is right (see
+    #: :func:`driftloop.data.yambda.listens_to_interactions`).
+    timestamp_unit_seconds: int = Field(default=1, ge=1)
 
 
 class DataConfig(_Strict):
@@ -193,4 +196,5 @@ def load_interactions(cfg: ExperimentConfig) -> pl.DataFrame:
         min_played_ratio_pct=y.min_played_ratio_pct,
         organic_only=y.organic_only,
         organic_value=y.organic_value,
+        timestamp_unit_seconds=y.timestamp_unit_seconds,
     )

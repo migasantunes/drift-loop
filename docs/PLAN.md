@@ -60,19 +60,20 @@ so every later milestone plugs a better component into a harness that already wo
 **Goal.** Replace synthetic data with Yambda-50M and get the first honest result.
 
 **Tasks.**
+0. Settle the timestamp unit (open question 1 in `docs/DATASET.md`) before anything else; every window length depends on it.
 1. Download Yambda-50M (`flat/50m`) and convert it with the existing adapter. Record row counts at every filtering step in `docs/DATASET.md`.
 2. Exploratory notebook: events per day, the real time span, catalogue growth, share of events on items younger than a week, repeat-listen rate, organic share. Resolve the two open questions in `docs/DATASET.md` (meaning of `is_organic`, licence wording).
 3. Choose the replay settings from the data (warm-up, window length, training lookback) and write them to `configs/yambda-50m.yaml` with the reasoning in `docs/DECISIONS.md`.
 4. Add two stronger baselines behind the `Recommender` protocol: time-decayed popularity and item-kNN (co-occurrence, sparse).
 5. Add a performance-based policy, `OnDecay`: retrain when the metric on the last completed window falls a set fraction below the level measured right after the last retrain. Labels arrive immediately in this domain, so this is a fair and strong competitor to input-drift detection.
-6. Run all policies and all baselines; commit the chart and the summary table to `docs/results/`.
+6. Run all policies and all baselines; commit the chart and the summary table to `docs/results/`. Report results over several seeds or several schedule phases where randomness is involved: on the M0 demo, schedules of equal cost differed by about 0.1 in kept quality from phase and seed alone.
 7. Sensitivity runs: organic-only evaluation, and repeats-included ground truth.
 8. Add a bursty-drift scenario to the synthetic generator (a sudden catalogue or trend shock) and check that `on_drift` beats a schedule of equal cost there. On the smooth M0 demo it did not (decision D12).
 9. Report each policy relative to `always` at the same window as well as in absolute terms, since absolute recall falls for every policy as user histories grow.
 
 **Acceptance.** `driftloop simulate --config configs/yambda-50m.yaml` reproduces the committed table from a clean clone plus the downloaded data. Memory stays under 12 GB.
 
-**Risks.** 46 M rows need care: stay in Polars lazy frames, never convert the full table to Python objects. `SeenItems` may need a compact (CSR) representation at this size.
+**Risks.** 46 M rows need care: stay in Polars lazy frames, never convert the full table to Python objects. Known from the M0 review and to be fixed first in M1: `evaluate_window` rebuilds ground truth and seen items from the full history once per policy per window although they depend only on the window (prepare once, score per policy); the drift reference is rebuilt every window even when the model has not changed (cache by training cut-off); `SeenItems` and the popularity model loop over users in Python.
 
 **Interview checkpoint.** How fast does a frozen model decay on this data, and what drives it: new items, shifting popularity or changing users? How did you pick the window length?
 

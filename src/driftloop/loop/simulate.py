@@ -103,13 +103,26 @@ class _PolicyState:
     rows: list[dict[str, Any]] = field(default_factory=list)
 
 
-def _fit(factory: ModelFactory, train: pl.DataFrame, until: int) -> tuple[Recommender, float]:
+def _fit(
+    factory: ModelFactory, train: pl.DataFrame, until: int, lookback_days: int | None
+) -> tuple[Recommender, float]:
     """Fit a brand-new model and time it.
 
     A new instance every time, never a refit of the one in service, so a retrain
     cannot inherit state from the previous model and the old model stays usable
     until the new one exists (which is how promotion will work in M4).
+
+    An empty training set is an error rather than a model that recommends nothing: it
+    means the lookback fell into a gap in the data, and silently serving an empty
+    model would show up only as a mysterious zero-recall stretch in the results.
     """
+    if train.height == 0:
+        span = "all history" if lookback_days is None else f"lookback_days={lookback_days}"
+        raise ValueError(
+            f"no training data before simulated time t={until} with {span}; "
+            "the lookback contains no interactions (a gap in the data?), so lengthen "
+            "lookback_days or check the input"
+        )
     model = factory()
     began = time.perf_counter()
     model.fit(train, until=until)
@@ -149,7 +162,7 @@ def run_simulation(
     # model, they replace it, so sharing the object is safe and keeps them identical.
     t0 = windows[0].start
     initial_model, initial_fit_seconds = _fit(
-        factory, history_before(interactions, t0, lookback=lookback), t0
+        factory, history_before(interactions, t0, lookback=lookback), t0, replay.lookback_days
     )
     states = [_PolicyState(policy=p, model=initial_model, trained_until=t0) for p in policies]
 
@@ -182,7 +195,7 @@ def run_simulation(
             retrained = state.policy.should_retrain(ctx) and state.trained_until != t
             fit_seconds = 0.0
             if retrained:
-                state.model, fit_seconds = _fit(factory, train, t)
+                state.model, fit_seconds = _fit(factory, train, t, replay.lookback_days)
                 state.trained_until = t
 
             result = evaluate_window(state.model, history=visible, future=future, k=k)

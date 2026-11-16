@@ -12,6 +12,7 @@ import pytest
 import yaml
 
 from driftloop.config import ExperimentConfig, load_config, load_interactions
+from driftloop.data.schema import to_canonical
 from driftloop.drift.detector import SIGNAL_NAMES
 from driftloop.loop.simulate import (
     ROW_SCHEMA,
@@ -20,6 +21,7 @@ from driftloop.loop.simulate import (
     summarize,
     write_run,
 )
+from driftloop.replay.clock import DAY
 
 CONFIGS = Path(__file__).resolve().parents[2] / "configs"
 
@@ -155,6 +157,32 @@ def test_tuning_windows_must_leave_scored_windows() -> None:
         run_simulation(load_interactions(cfg), cfg)
 
 
+def _gapped_interactions() -> pl.DataFrame:
+    """Daily events on days 0-27 and 42-55, nothing on days 28-41."""
+    days = [d for d in range(56) if d < 28 or d >= 42]
+    return to_canonical(
+        pl.DataFrame(
+            {
+                "user_id": [d % 3 for d in days],
+                "item_id": [d % 5 for d in days],
+                "ts": [d * DAY for d in days],
+                "weight": [1.0] * len(days),
+            }
+        )
+    )
+
+
+def test_empty_training_set_is_an_error() -> None:
+    # Windows start on days 28, 35, 42, 49. The warm-up fit at day 28 sees days 21-27;
+    # the retrain at day 35 would see days 28-34, which are empty.
+    cfg = _config(
+        replay={"warmup_days": 28, "step_days": 7, "lookback_days": 7, "tuning_windows": 0},
+        policies=["always"],
+    )
+    with pytest.raises(ValueError, match=rf"t={35 * DAY} with lookback_days=7"):
+        run_simulation(_gapped_interactions(), cfg)
+
+
 def test_lookback_none_trains_on_all_history() -> None:
     cfg = _config(replay={"lookback_days": None}, policies=["never", "always"])
     result = run_simulation(load_interactions(cfg), cfg)
@@ -222,8 +250,14 @@ def test_control_with_drift_retraining_pays_off() -> None:
 # --- summary arithmetic -------------------------------------------------------------
 
 
-def _rows(spec: dict[str, list[tuple[float, bool]]]) -> pl.DataFrame:
-    """Rows from {policy: [(recall, retrained) per window]}; other metrics mirror recall."""
+def _rows(
+    spec: dict[str, list[tuple[float, bool]]], fit_seconds: dict[str, float] | None = None
+) -> pl.DataFrame:
+    """Rows from {policy: [(recall, retrained) per window]}; other metrics mirror recall.
+
+    ``fit_seconds`` gives each policy's duration per retrain (default 0.5).
+    """
+    durations = fit_seconds or {}
     records = [
         {
             "policy": policy,
@@ -233,7 +267,7 @@ def _rows(spec: dict[str, list[tuple[float, bool]]]) -> pl.DataFrame:
             "hit_rate": recall,
             "coverage": recall,
             "retrained": retrained,
-            "fit_seconds": 0.5 if retrained else 0.0,
+            "fit_seconds": durations.get(policy, 0.5) if retrained else 0.0,
         }
         for policy, values in spec.items()
         for w, (recall, retrained) in enumerate(values)
@@ -250,7 +284,10 @@ def test_summary_hand_checked() -> None:
             "always": [(0.9, True), (0.3, True), (0.3, True)],
             # NaN (no evaluable users) is skipped, not averaged as zero.
             "fixed:2": [(0.9, False), (0.2, True), (nan, False)],
-        }
+        },
+        # fixed:2's retrain is 5x faster than always's, so a seconds-based cost share
+        # would be 0.1 / 1.0 = 0.1, not the count-based 1 / 2 = 0.5 asserted below.
+        fit_seconds={"always": 0.5, "fixed:2": 0.1},
     )
     s = summarize(rows, tuning_windows=1)["policies"]
     assert s["never"]["mean_recall"] == pytest.approx(0.1)
@@ -258,6 +295,7 @@ def test_summary_hand_checked() -> None:
     assert s["fixed:2"]["mean_recall"] == pytest.approx(0.2)
     assert s["always"]["retrains"] == 2
     assert s["always"]["retrain_seconds"] == pytest.approx(1.0)
+    assert s["fixed:2"]["retrain_seconds"] == pytest.approx(0.1)
     assert s["fixed:2"]["quality_kept"] == pytest.approx(0.5)
     assert s["fixed:2"]["cost_share"] == pytest.approx(0.5)
     assert s["never"]["quality_kept"] == pytest.approx(0.0)

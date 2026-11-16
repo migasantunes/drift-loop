@@ -6,6 +6,7 @@ import dataclasses
 from pathlib import Path
 from typing import Any
 
+import polars as pl
 import pytest
 import yaml
 from pydantic import ValidationError
@@ -16,7 +17,7 @@ from driftloop.config import (
     load_config,
     load_interactions,
 )
-from driftloop.data.schema import validate_interactions
+from driftloop.data.schema import TS, validate_interactions
 from driftloop.data.synthetic import SyntheticConfig
 from driftloop.drift.detector import DriftThresholds
 from driftloop.replay.clock import DAY
@@ -111,6 +112,7 @@ def test_non_positive_durations_are_rejected(tmp_path: Path, replay: dict[str, i
         {"data": {"source": "synthetic", "synthetic": {"n_users": 0}}},
         {"data": {"source": "synthetic", "synthetic": {"drift_strength": -1}}},
         {"data": {"source": "yambda", "yambda": {"size": "1m"}}},
+        {"data": {"source": "yambda", "yambda": {"timestamp_unit_seconds": 0}}},
         {"drift": {"n_buckets": 0}},
         {"model": {"name": "two_tower"}},
         {"name": ""},
@@ -159,3 +161,22 @@ def test_load_interactions_yambda_missing_file(tmp_path: Path) -> None:
     raw = _minimal() | {"data": {"source": "yambda", "yambda": {"data_dir": str(tmp_path)}}}
     with pytest.raises(FileNotFoundError):
         load_interactions(load_config(_write(tmp_path, raw)))
+
+
+@pytest.mark.parametrize("unit", [1, 5])
+def test_load_interactions_yambda_threads_timestamp_unit(tmp_path: Path, unit: int) -> None:
+    target = tmp_path / "flat" / "50m"
+    target.mkdir(parents=True)
+    pl.DataFrame(
+        {"uid": [1, 2], "item_id": [10, 20], "timestamp": [0, 3], "played_ratio_pct": [100, 100]},
+        schema={
+            "uid": pl.UInt32,
+            "item_id": pl.UInt32,
+            "timestamp": pl.UInt32,
+            "played_ratio_pct": pl.UInt16,
+        },
+    ).write_parquet(target / "listens.parquet")
+    yambda_section = {"data_dir": str(tmp_path), "timestamp_unit_seconds": unit}
+    raw = _minimal() | {"data": {"source": "yambda", "yambda": yambda_section}}
+    df = load_interactions(load_config(_write(tmp_path, raw)))
+    assert df.get_column(TS).to_list() == [0, 3 * unit]

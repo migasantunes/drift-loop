@@ -55,7 +55,11 @@ class Never:
 
 @dataclass(frozen=True, slots=True)
 class Always:
-    """Retrain before every window: the upper bound on quality and on cost."""
+    """Retrain before every window: the reference point with the most frequent retraining.
+
+    It is the upper bound on cost, but not guaranteed to be the best on quality in every
+    window: a model fitted on one more window of noisy data can score below an older one.
+    """
 
     @property
     def name(self) -> str:

@@ -8,7 +8,8 @@ repos:
       - id: check-merge-conflict
       - id: check-yaml
 
-  # Keep rev in step with the ruff version in uv.lock so the hook and `make lint` agree.
+  # Keep rev close to the ruff version in uv.lock so the hook and `make lint` agree
+  # (bump both together; `pre-commit autoupdate` does this side).
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.17.3
     hooks:
