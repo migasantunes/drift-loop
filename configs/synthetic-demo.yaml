@@ -1,0 +1,88 @@
+# The `make demo` experiment: a synthetic replay where the truth is known.
+#
+# What it should show: a frozen popularity model (`never`) decays as new items and
+# users arrive, retraining before every window (`always`) recovers, and the schedule
+# and drift-triggered policies land somewhere between at a fraction of the cost.
+#
+# Reading the curves: recall falls over time for every policy, including `always`,
+# and it does so even with drift_strength: 0. That is the protocol, not staleness:
+# ground truth is new-to-user items, and as each user's history grows the popular
+# items they have not yet seen get rarer. Compare policies with each other at the
+# same window, not a curve with its own start.
+#
+# Runs in about 20 s on a laptop (most of it scoring, not training).
+
+name: synthetic-demo
+
+data:
+  source: synthetic
+  synthetic:
+    # The generator default (1.0) makes every week look like a new catalogue. 0.3 is
+    # the low end of the realistic range and was chosen before any threshold: it is
+    # the smallest value tried (0, 0.3, 0.5) at which always beats never clearly.
+    # That choice was made by looking at full-replay outcomes, so this demo
+    # illustrates the harness and is not evidence about any policy.
+    drift_strength: 0.3
+    # 20 weeks: 4 warm-up weeks, then 15 one-week windows (4 tuning + 11 scored).
+    # Windows start at the first event's timestamp, not at day 0 of the generator, so
+    # the last partial week does not make a 16th window: 20 weeks give 15 windows.
+    n_days: 140
+    seed: 0
+    # Everything else is the generator default, listed so the file is the full record.
+    n_users: 2000
+    n_new_users_per_day: 5.0
+    n_items_initial: 3000
+    n_new_items_per_day: 40.0
+    n_clusters: 20
+    events_per_user_per_day: 3.0
+    preference_concentration: 0.3
+    item_popularity_exponent: 1.0
+    freshness_boost: 20.0
+    freshness_decay_days: 5.0
+    trend_volatility: 0.08
+    taste_volatility: 0.05
+
+replay:
+  warmup_days: 28
+  step_days: 7
+  lookback_days: 28
+  # Windows 0-3 are the windows the drift thresholds below were chosen on. They are
+  # replayed and plotted (shaded) but excluded from every number in summary.json.
+  tuning_windows: 4
+
+eval:
+  k: 20
+
+model:
+  name: popularity
+
+# fixed:2 retrains about as often as on_drift does here, so it is the like-for-like
+# schedule to compare drift-triggered retraining against; fixed:4 is the cheaper one.
+policies: [never, always, "fixed:2", "fixed:4", on_drift]
+
+drift:
+  n_buckets: 10
+  # How the thresholds were chosen (from windows 0-3 only, with every threshold
+  # disabled; the signals are recorded either way, so results.csv lets you check):
+  #
+  # Rule: threshold = 1.5 x the largest value a one-window-old model (the `always`
+  # rows) saw during the tuning windows, i.e. fire once the input has moved 50%
+  # more than ordinary week-to-week churn.
+  #
+  #   signal           max at age 1 (windows 1-3)   x 1.5      frozen model, age 2-3
+  #   new_item_share   0.0537                       0.081      0.109, 0.127
+  #   new_user_share   0.00507                      0.0076     0.0132, 0.0186
+  #
+  # popularity_psi and popularity_jsd are disabled: in the tuning windows the frozen
+  # model reads lower on both (PSI 0.0030, 0.0019 at age 2-3) than a fresh one
+  # (0.0053-0.0075), so on this generator they do not track staleness. They are not
+  # pure sampling noise either: with drift off their floor is about 0.001-0.002,
+  # while fresh models here read 0.004-0.009. A likely cause is the decaying
+  # freshness boost (last week's hits fading from the reference ranking), but that
+  # is not established. Trends here move demand between clusters, which the
+  # popularity-rank buckets of a single global ranking barely register.
+  thresholds:
+    popularity_psi: null
+    popularity_jsd: null
+    new_item_share: 0.081
+    new_user_share: 0.0076

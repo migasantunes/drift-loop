@@ -1,0 +1,36 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Data and run outputs are never committed (see docs/DATASET.md).
+# Anchored to the repo root: an unanchored `data/` would also ignore src/driftloop/data.
+/data/
+/runs/
+/mlruns/
+*.parquet
+*.npy
+*.faiss
+
+# Infrastructure state and secrets
+.env
+.env.*
+!.env.example
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!example.tfvars
+kubeconfig*
+
+.DS_Store
+.idea/
+.vscode/
+.ipynb_checkpoints/
